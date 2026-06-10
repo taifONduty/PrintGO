@@ -1,27 +1,67 @@
 "use client";
 
-import React, { Suspense, useRef, useState } from "react";
+import React, { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell, PriceBar } from "@/components/Shell";
 import { FileDropzone } from "@/components/FileDropzone";
 import { PreviewOverlay } from "@/components/PreviewOverlay";
 import { Icon, PagePreview, AddMoreTile } from "@/components/ui";
 import { TK, rgba } from "@/lib/theme";
-import { uploadFile, addFile, removeFile, ApiError, type Job, type FileItem } from "@/lib/api";
+import {
+  uploadFile,
+  addFile,
+  removeFile,
+  getJob,
+  fileContentUrl,
+  ApiError,
+  type Job,
+  type FileItem,
+} from "@/lib/api";
+
+interface Pending {
+  key: string;
+  name: string;
+}
 
 function UploadInner() {
   const router = useRouter();
   const params = useSearchParams();
   const machine = params.get("machine");
+  const storageKey = machine ? `pg_job_${machine}` : null;
 
   const [job, setJob] = useState<Job | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [busyLabel, setBusyLabel] = useState("");
+  const [pending, setPending] = useState<Pending[]>([]);
+  const [restoring, setRestoring] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<FileItem | null>(null);
   const addInputRef = useRef<HTMLInputElement>(null);
+  const counter = useRef(0);
 
-  // No machine in the QR URL → block upload entirely.
+  // Restore an in-progress job (still "created") across refresh / back-nav.
+  useEffect(() => {
+    if (!storageKey) {
+      setRestoring(false);
+      return;
+    }
+    const stored = sessionStorage.getItem(storageKey);
+    if (!stored) {
+      setRestoring(false);
+      return;
+    }
+    let alive = true;
+    getJob(stored)
+      .then((j) => {
+        if (!alive) return;
+        if (j.status === "created") setJob(j);
+        else sessionStorage.removeItem(storageKey);
+      })
+      .catch(() => sessionStorage.removeItem(storageKey))
+      .finally(() => alive && setRestoring(false));
+    return () => {
+      alive = false;
+    };
+  }, [storageKey]);
+
   if (!machine) {
     return (
       <AppShell showRail={false}>
@@ -48,24 +88,24 @@ function UploadInner() {
     );
   }
 
-  // Upload a batch of files sequentially: the first creates the job, the rest
-  // are appended to it.
-  const addFiles = async (files: File[]) => {
+  // Upload a batch sequentially. Cards for each file appear immediately as
+  // "processing" placeholders, then become real once the server responds.
+  const addFiles = async (selected: File[]) => {
     setError(null);
-    setBusy(true);
+    const entries: Pending[] = selected.map((f) => ({ key: `p${counter.current++}`, name: f.name }));
+    setPending((p) => [...p, ...entries]);
+
     let current = job;
-    try {
-      for (let i = 0; i < files.length; i++) {
-        const f = files[i];
-        setBusyLabel(files.length > 1 ? `Uploading ${i + 1} of ${files.length}…` : "Uploading…");
-        current = current ? await addFile(current.id, f) : await uploadFile(f, machine);
+    for (let i = 0; i < selected.length; i++) {
+      try {
+        current = current ? await addFile(current.id, selected[i]) : await uploadFile(selected[i], machine);
         setJob(current);
+        if (storageKey) sessionStorage.setItem(storageKey, current.id);
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : "Upload failed. Please try again.");
+      } finally {
+        setPending((p) => p.filter((e) => e.key !== entries[i].key));
       }
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Upload failed. Please try again.");
-    } finally {
-      setBusy(false);
-      setBusyLabel("");
     }
   };
 
@@ -73,7 +113,8 @@ function UploadInner() {
     if (!job) return;
     setError(null);
     try {
-      setJob(await removeFile(job.id, fileId));
+      const updated = await removeFile(job.id, fileId);
+      setJob(updated);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not remove the file.");
     }
@@ -82,19 +123,33 @@ function UploadInner() {
   const goConfigure = () => router.push(`/configure/${job!.id}?machine=${encodeURIComponent(machine)}`);
 
   const files = job?.files ?? [];
-  const empty = files.length === 0;
+  const busy = pending.length > 0;
+  const empty = files.length === 0 && pending.length === 0;
+
+  if (restoring) {
+    return (
+      <AppShell step={0}>
+        <div style={{ padding: 40, textAlign: "center", color: TK.muted, fontSize: 14 }}>Loading…</div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell
       step={0}
       footer={
-        !empty ? (
-          <PriceBar price={job!.price_taka} label="Configure print" sub="From" onNext={goConfigure} disabled={busy} />
+        files.length > 0 || busy ? (
+          <PriceBar
+            price={job?.price_taka ?? "0.00"}
+            label={busy ? "Uploading…" : "Configure print"}
+            sub="From"
+            onNext={goConfigure}
+            disabled={busy || files.length === 0}
+          />
         ) : null
       }
       overlay={<PreviewOverlay file={preview} onClose={() => setPreview(null)} />}
     >
-      {/* hidden input for "Add more" */}
       <input
         ref={addInputRef}
         type="file"
@@ -109,15 +164,7 @@ function UploadInner() {
       />
 
       <div className="pg-fade" style={{ padding: "6px 18px 18px" }}>
-        <h1
-          style={{
-            fontSize: 25,
-            fontWeight: 800,
-            color: TK.ink,
-            letterSpacing: "-.025em",
-            margin: "4px 0 4px",
-          }}
-        >
+        <h1 style={{ fontSize: 25, fontWeight: 800, color: TK.ink, letterSpacing: "-.025em", margin: "4px 0 4px" }}>
           What are we printing?
         </h1>
         <p style={{ fontSize: 14.5, color: TK.muted, margin: "0 0 20px", lineHeight: 1.45 }}>
@@ -125,7 +172,7 @@ function UploadInner() {
         </p>
 
         {empty ? (
-          <FileDropzone onFiles={addFiles} disabled={busy} />
+          <FileDropzone onFiles={addFiles} />
         ) : (
           <div
             style={{
@@ -141,15 +188,19 @@ function UploadInner() {
                 name={f.original_filename}
                 pages={f.page_count}
                 kind={f.kind}
+                previewSrc={fileContentUrl(f.job_id, f.id)}
                 onDelete={() => onRemove(f.id)}
                 onExpand={() => setPreview(f)}
               />
+            ))}
+            {pending.map((p) => (
+              <PagePreview key={p.key} name={p.name} pages={1} kind="doc" processing />
             ))}
             <AddMoreTile onClick={() => addInputRef.current?.click()} />
           </div>
         )}
 
-        {!empty && (
+        {!empty && job && (
           <div
             className="pg-rise"
             style={{
@@ -162,12 +213,12 @@ function UploadInner() {
               padding: "12px 16px",
             }}
           >
-            {busy && <Spinner />}
+            <Icon name="spark" size={20} color={TK.accentDark} />
             <span style={{ fontSize: 13.5, color: TK.accentDark, fontWeight: 600, lineHeight: 1.4 }}>
               {busy
-                ? busyLabel
-                : `${files.length} file${files.length > 1 ? "s" : ""} · ${job!.page_count} page${
-                    job!.page_count > 1 ? "s" : ""
+                ? "Adding your files…"
+                : `${files.length} file${files.length > 1 ? "s" : ""} · ${job.page_count} page${
+                    job.page_count > 1 ? "s" : ""
                   } ready to configure`}
             </span>
           </div>
@@ -176,35 +227,13 @@ function UploadInner() {
         {error && (
           <div
             className="pg-rise"
-            style={{
-              marginTop: 16,
-              background: rgba(TK.danger, 0.08),
-              borderRadius: TK.radius,
-              padding: "12px 16px",
-            }}
+            style={{ marginTop: 16, background: rgba(TK.danger, 0.08), borderRadius: TK.radius, padding: "12px 16px" }}
           >
             <span style={{ fontSize: 13.5, color: TK.danger, fontWeight: 600 }}>{error}</span>
           </div>
         )}
       </div>
     </AppShell>
-  );
-}
-
-function Spinner() {
-  return (
-    <span
-      style={{
-        width: 16,
-        height: 16,
-        borderRadius: "50%",
-        border: `2px solid ${rgba(TK.accentDark, 0.3)}`,
-        borderTopColor: TK.accentDark,
-        display: "inline-block",
-        animation: "pgSpin .8s linear infinite",
-        flexShrink: 0,
-      }}
-    />
   );
 }
 

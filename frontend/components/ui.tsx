@@ -686,24 +686,48 @@ function FauxPage({ kind }: { kind: FileKind }) {
 
 export type FileKind = "doc" | "img";
 
+// PdfThumb renders a real, static first-page thumbnail of a PDF via an iframe
+// (toolbar/scrollbars hidden, non-interactive).
+function PdfThumb({ src }: { src: string }) {
+  return (
+    <iframe
+      src={`${src}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+      title="preview"
+      scrolling="no"
+      style={{
+        width: "100%",
+        height: "100%",
+        border: "none",
+        background: "#fff",
+        pointerEvents: "none",
+      }}
+    />
+  );
+}
+
 // ── Page preview card (upload grid tile) ────────────────────────────────────
 export function PagePreview({
   name,
   pages,
   kind,
+  previewSrc,
+  processing = false,
   onDelete,
   onExpand,
 }: {
   name: string;
   pages: number;
   kind: FileKind;
-  onDelete: () => void;
-  onExpand: () => void;
+  previewSrc?: string;
+  processing?: boolean;
+  onDelete?: () => void;
+  onExpand?: () => void;
 }) {
   return (
     <div className="pg-tile" style={{ position: "relative", width: "100%" }}>
       <div
         style={{
+          position: "relative",
           width: "100%",
           aspectRatio: "1 / 1.4",
           background: "#fff",
@@ -711,27 +735,42 @@ export function PagePreview({
           border: `1px solid ${TK.line}`,
           boxShadow: "0 6px 18px rgba(33,29,23,.08)",
           overflow: "hidden",
-          padding: kind === "img" ? 0 : "14px 12px",
+          padding: previewSrc ? 0 : kind === "img" ? 0 : "14px 12px",
           display: "flex",
           flexDirection: "column",
           gap: 7,
         }}
       >
-        <FauxPage kind={kind} />
+        {previewSrc ? <PdfThumb src={previewSrc} /> : <FauxPage kind={kind} />}
+        {processing && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "rgba(255,255,255,.66)",
+              backdropFilter: "blur(1px)",
+              display: "grid",
+              placeItems: "center",
+            }}
+          >
+            <Spinner size={30} />
+          </div>
+        )}
       </div>
-      <div style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 6 }}>
-        <button
-          className="pg-press"
-          onClick={onExpand}
-          title="Preview"
-          style={iconBtn}
-        >
-          <Icon name="expand" size={16} color={TK.inkSoft} stroke={2.4} />
-        </button>
-        <button className="pg-press" onClick={onDelete} title="Remove" style={iconBtn}>
-          <Icon name="trash" size={16} color={TK.danger} stroke={2.2} />
-        </button>
-      </div>
+      {!processing && (
+        <div style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 6 }}>
+          {onExpand && (
+            <button className="pg-press" onClick={onExpand} title="Preview" style={iconBtn}>
+              <Icon name="expand" size={16} color={TK.inkSoft} stroke={2.4} />
+            </button>
+          )}
+          {onDelete && (
+            <button className="pg-press" onClick={onDelete} title="Remove" style={iconBtn}>
+              <Icon name="trash" size={16} color={TK.danger} stroke={2.2} />
+            </button>
+          )}
+        </div>
+      )}
       <div style={{ marginTop: 9, textAlign: "center" }}>
         <div
           style={{
@@ -747,7 +786,7 @@ export function PagePreview({
           {name}
         </div>
         <div style={{ fontSize: 11, color: TK.muted }}>
-          {pages} page{pages > 1 ? "s" : ""}
+          {processing ? "Processing…" : `${pages} page${pages > 1 ? "s" : ""}`}
         </div>
       </div>
     </div>
@@ -805,7 +844,17 @@ export function AddMoreTile({ onClick }: { onClick: () => void }) {
 }
 
 // ── Mini doc thumbnail (configure files strip) ───────────────────────────────
-export function MiniDoc({ name, kind, onClick }: { name: string; kind: FileKind; onClick: () => void }) {
+export function MiniDoc({
+  name,
+  kind,
+  previewSrc,
+  onClick,
+}: {
+  name: string;
+  kind: FileKind;
+  previewSrc?: string;
+  onClick: () => void;
+}) {
   return (
     <button
       className="pg-press"
@@ -824,10 +873,12 @@ export function MiniDoc({ name, kind, onClick }: { name: string; kind: FileKind;
           display: "flex",
           flexDirection: "column",
           gap: 5,
-          padding: kind === "img" ? 0 : "9px 8px",
+          padding: previewSrc ? 0 : kind === "img" ? 0 : "9px 8px",
         }}
       >
-        {kind === "img" ? (
+        {previewSrc ? (
+          <PdfThumb src={previewSrc} />
+        ) : kind === "img" ? (
           <PlaceholderArt />
         ) : (
           <>
