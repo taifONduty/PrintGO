@@ -173,31 +173,42 @@ and blocks upload (the `machine_id` is the prototype's only access control).
 
 ## Flow & API
 
-| Step      | Frontend route          | Backend endpoint                          |
-| --------- | ----------------------- | ----------------------------------------- |
-| Upload    | `/upload?machine=VM001` | `POST /api/upload`                        |
-| Configure | `/configure/{jobId}`    | `GET /api/jobs/{id}`, `PUT …/config`      |
-| Pay       | `/pay/{jobId}`          | `POST /api/jobs/{id}/pay` → gateway        |
-| Return    | (gateway → backend)     | `GET\|POST /api/payment/return` → 302      |
-| Confirm   | —                       | `POST /api/ipn` (source of truth)          |
-| Status    | `/status/{jobId}`       | `GET /api/jobs/{id}/status` (polled 3s)    |
+A job holds **multiple files**. The frontend flow is 5 steps + status:
+
+| Step      | Frontend route          | Backend endpoint                                   |
+| --------- | ----------------------- | -------------------------------------------------- |
+| Upload    | `/upload?machine=VM001` | `POST /api/upload` (1st file → creates job)        |
+|           |                         | `POST /api/jobs/{id}/files` (add), `DELETE …/files/{fileId}` (remove) |
+| Configure | `/configure/{jobId}`    | `GET /api/jobs/{id}`, `PUT …/config`               |
+| Review    | `/review/{jobId}`       | `GET /api/jobs/{id}`                               |
+| Verify    | `/verify/{jobId}`       | — (client-side OTP demo, code `1234`, no SMS)      |
+| Pay       | `/pay/{jobId}`          | `POST /api/jobs/{id}/pay` → gateway                |
+| Return    | (gateway → backend)     | `GET\|POST /api/payment/return` → 302              |
+| Confirm   | —                       | `POST /api/ipn` (source of truth)                  |
+| Status    | `/status/{jobId}`       | `GET /api/jobs/{id}/status` (polled 3s)            |
+
+A job's `page_count` is the **aggregate** across its files. Each file is saved
+under `uploads/{job_id}/{file_id}/` and gets its own print-ready PDF.
 
 Pricing (backend, configurable via env):
 
 ```
-effective_pages = (page range set) ? to - from + 1 : page_count
+total_pages     = sum(file.page_count for file in job.files)
+effective_pages = (page range set) ? to - from + 1 : total_pages
 per_page_rate   = color ? COLOR_RATE_TAKA : BW_RATE_TAKA
-price_taka      = effective_pages × copies × per_page_rate   (min MIN_ORDER_TAKA)
+price_taka      = effective_pages × copies × per_page_rate
+                  + SERVICE_FEE_TAKA (when the job has files)     (min MIN_ORDER_TAKA)
 ```
 
-Duplex has no price effect in v1 (print instruction only). Money is returned as
-a 2-decimal string (e.g. `"20.00"`).
+Duplex has no price effect (print instruction only). Money is returned as a
+2-decimal string (e.g. `"20.00"`).
 
 ### Endpoints for the PC polling script (not in this repo)
 
 - `GET  /api/machine/jobs/next?machine_id=VM001` — atomically claims the oldest
   `paid` job (`FOR UPDATE SKIP LOCKED`), flips it to `queued`, returns the full
-  job incl. `file_path`. `204` when none waiting.
+  job incl. its `files` array (each with a `file_path` to print). `204` when none
+  waiting.
 - `POST /api/machine/jobs/{job_id}/status` — body
   `{ "status": "printing" | "completed" | "failed", "message": "..." }`.
 
@@ -207,11 +218,12 @@ a 2-decimal string (e.g. `"20.00"`).
 
 - **CORS** is applied only to the browser-facing routes for `FRONTEND_URL`.
   `/api/ipn` and `/api/machine/*` are server-to-server and need none.
-- **Uploads**: files live under `backend/uploads/{job_id}/`. There is no cleanup
-  automation — clear this directory periodically in a real deployment.
-- **No authentication** — by design for the prototype.
-- **Design vs. spec**: the design bundle includes OTP-verify and a separate
-  review screen; per the app spec there is no auth, so OTP is omitted and the
-  review summary is folded into the pay screen. Everything else (tokens,
-  components, layout) follows the design.
+- **Uploads**: files live under `backend/uploads/{job_id}/{file_id}/`. There is
+  no cleanup automation — clear this directory periodically in a real deployment.
+- **No real authentication** — the `machine_id` is the only access control. The
+  Verify/OTP screen is a UX demo from the design (fixed code `1234`, no SMS
+  backend); it does not gate anything server-side.
+- **Design fidelity**: the full 7-screen PrintGO design is implemented —
+  multi-file upload grid + page-preview sheet, configure breakdown, separate
+  Review and Verify screens, 5-step rail, tokens, and components.
 ```

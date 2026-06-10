@@ -54,6 +54,11 @@ export type Theme = typeof TK;
 // Kiosk identity (display-only in the prototype's header chip).
 export const KIOSK = { name: "Dhaka University", sub: "CSE Complex" };
 
+// Per-page display rates + service fee (backend price is authoritative; these
+// only drive the configure-screen breakdown line items). Mirror the backend
+// defaults: BW ৳2/page, Color ৳5/page, ৳3 flat service fee.
+export const RATES = { bw: 2, color: 5, serviceFee: 3 };
+
 // Format a money string from the API ("20.00") for display: "৳20.00".
 export function taka(price: string | number) {
   return "৳" + String(price);

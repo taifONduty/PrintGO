@@ -16,24 +16,24 @@ const ACCEPT = {
 const MAX_BYTES = 20 * 1024 * 1024;
 
 export function FileDropzone({
-  onFile,
+  onFiles,
   disabled,
 }: {
-  onFile: (file: File) => void;
+  onFiles: (files: File[]) => void;
   disabled?: boolean;
 }) {
   const onDrop = useCallback(
     (accepted: File[]) => {
-      if (accepted[0]) onFile(accepted[0]);
+      if (accepted.length) onFiles(accepted);
     },
-    [onFile],
+    [onFiles],
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: ACCEPT,
     maxSize: MAX_BYTES,
-    multiple: false,
+    multiple: true,
     disabled,
   });
 

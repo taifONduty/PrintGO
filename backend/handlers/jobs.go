@@ -72,6 +72,7 @@ func (a *App) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 
 	price := services.Price(services.PriceInput{
 		PageCount:     job.PageCount,
+		FilesCount:    len(job.Files),
 		Copies:        req.Copies,
 		Color:         req.Color,
 		PageRangeFrom: from,

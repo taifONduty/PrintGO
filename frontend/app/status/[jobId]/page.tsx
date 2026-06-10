@@ -9,9 +9,9 @@ export default function StatusPage() {
   const { jobId } = useParams<{ jobId: string }>();
   const router = useRouter();
 
-  // End of flow — no back button, step rail shows the final "Done" bucket.
+  // End of flow — no back button; all rail buckets are complete.
   return (
-    <AppShell step={3} showRail>
+    <AppShell step={5} showRail>
       <StatusPoller jobId={jobId} onReset={() => router.push("/upload")} />
     </AppShell>
   );

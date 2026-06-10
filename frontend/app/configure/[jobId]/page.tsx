@@ -4,14 +4,10 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { AppShell, PriceBar } from "@/components/Shell";
 import { PrintConfigForm, type LocalConfig } from "@/components/PrintConfigForm";
-import { Icon } from "@/components/ui";
-import { TK, taka } from "@/lib/theme";
-import { getJob, updateConfig, ApiError, type Job, type JobConfig } from "@/lib/api";
-
-// Per-page display rates (the backend price is authoritative; these only label
-// the color cards). Mirror the backend defaults.
-const BW_RATE = 2;
-const COLOR_RATE = 5;
+import { PreviewOverlay } from "@/components/PreviewOverlay";
+import { MiniDoc, Row } from "@/components/ui";
+import { TK, RATES } from "@/lib/theme";
+import { getJob, updateConfig, ApiError, type Job, type JobConfig, type FileItem } from "@/lib/api";
 
 function toApiConfig(cfg: LocalConfig): JobConfig {
   const custom = cfg.range === "custom";
@@ -31,9 +27,11 @@ function fromJob(job: Job): LocalConfig {
     copies: job.copies,
     duplex: job.duplex,
     range: custom ? "custom" : "all",
-    customPages: custom ? (job.page_range_to as number) : job.page_count,
+    customPages: custom ? (job.page_range_to as number) : Math.max(1, job.page_count),
   };
 }
+
+const moneyN = (n: number) => "৳" + n;
 
 export default function ConfigurePage() {
   const { jobId } = useParams<{ jobId: string }>();
@@ -46,11 +44,11 @@ export default function ConfigurePage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [preview, setPreview] = useState<FileItem | null>(null);
 
   const dirty = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load the job.
   useEffect(() => {
     let alive = true;
     getJob(jobId)
@@ -60,15 +58,12 @@ export default function ConfigurePage() {
         setCfg(fromJob(j));
         setPrice(j.price_taka);
       })
-      .catch((err) =>
-        setLoadError(err instanceof ApiError ? err.message : "Could not load your job."),
-      );
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Could not load your job."));
     return () => {
       alive = false;
     };
   }, [jobId]);
 
-  // Debounced config sync. Skips the initial hydrate.
   useEffect(() => {
     if (!cfg || !dirty.current) return;
     if (timer.current) clearTimeout(timer.current);
@@ -95,8 +90,8 @@ export default function ConfigurePage() {
     setCfg((prev) => (prev ? { ...prev, ...p } : prev));
   }, []);
 
-  const goPay = () =>
-    router.push(`/pay/${jobId}${machine ? `?machine=${encodeURIComponent(machine)}` : ""}`);
+  const goReview = () =>
+    router.push(`/review/${jobId}${machine ? `?machine=${encodeURIComponent(machine)}` : ""}`);
 
   if (loadError) {
     return (
@@ -110,116 +105,64 @@ export default function ConfigurePage() {
 
   if (!job || !cfg) {
     return (
-      <AppShell step={1} showRail>
-        <div style={{ padding: 40, textAlign: "center", color: TK.muted, fontSize: 14 }}>
-          Loading your document…
-        </div>
+      <AppShell step={1}>
+        <div style={{ padding: 40, textAlign: "center", color: TK.muted, fontSize: 14 }}>Loading your documents…</div>
       </AppShell>
     );
   }
+
+  // Live breakdown (display only; the bar total comes from the backend).
+  const totalPages = job.page_count;
+  const range = cfg.range === "custom" ? Math.min(cfg.customPages, totalPages) : totalPages;
+  const perPage = cfg.color ? RATES.color : RATES.bw;
+  const sheets = cfg.duplex ? Math.ceil(range / 2) : range;
+  const subtotal = range * perPage * cfg.copies;
+  const serviceFee = job.files.length ? RATES.serviceFee : 0;
 
   return (
     <AppShell
       step={1}
       onBack={() => router.back()}
-      footer={<PriceBar price={price} onNext={goPay} disabled={saving} />}
+      footer={<PriceBar price={price} onNext={goReview} disabled={saving} />}
+      overlay={<PreviewOverlay file={preview} onClose={() => setPreview(null)} />}
     >
       <div className="pg-fade" style={{ padding: "6px 18px 0" }}>
-        <h1
-          style={{
-            fontSize: 23,
-            fontWeight: 800,
-            color: TK.ink,
-            letterSpacing: "-.025em",
-            margin: "4px 0 18px",
-          }}
-        >
+        <h1 style={{ fontSize: 23, fontWeight: 800, color: TK.ink, letterSpacing: "-.025em", margin: "4px 0 18px" }}>
           Print settings
         </h1>
 
-        {/* file summary */}
+        {/* files strip */}
         <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            background: TK.card,
-            border: `1px solid ${TK.line}`,
-            borderRadius: TK.radius,
-            padding: "13px 16px",
-            marginBottom: 22,
-          }}
+          className="pg-scroll"
+          style={{ display: "flex", gap: 12, overflowX: "auto", margin: "0 -18px 22px", padding: "0 18px 4px" }}
         >
-          <span
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 11,
-              background: TK.accentTint,
-              display: "grid",
-              placeItems: "center",
-              flexShrink: 0,
-            }}
-          >
-            <Icon name="doc1" size={20} color={TK.accentDark} />
-          </span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: 14.5,
-                fontWeight: 600,
-                color: TK.ink,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {job.original_filename}
-            </div>
-            <div style={{ fontSize: 12, color: TK.muted }}>
-              {job.page_count} page{job.page_count > 1 ? "s" : ""}
-            </div>
-          </div>
+          {job.files.map((f) => (
+            <MiniDoc key={f.id} name={f.original_filename} kind={f.kind} onClick={() => setPreview(f)} />
+          ))}
         </div>
 
-        <PrintConfigForm
-          cfg={cfg}
-          pageCount={job.page_count}
-          bwRate={BW_RATE}
-          colorRate={COLOR_RATE}
-          onChange={patch}
-        />
+        <PrintConfigForm cfg={cfg} pageCount={totalPages} bwRate={RATES.bw} colorRate={RATES.color} onChange={patch} />
 
-        {/* live price line */}
+        {/* live breakdown */}
         <div
           style={{
             background: TK.card,
             border: `1px solid ${TK.line}`,
             borderRadius: TK.radius,
-            padding: "14px 16px",
+            padding: "4px 16px",
             margin: "4px 0 18px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
           }}
         >
-          <span style={{ fontSize: 14, fontWeight: 600, color: TK.inkSoft }}>Estimated total</span>
-          <span
-            style={{
-              fontSize: 22,
-              fontWeight: 800,
-              color: TK.accent,
-              fontVariantNumeric: "tabular-nums",
-            }}
-          >
-            {taka(price)}
-          </span>
+          <Row
+            k={`${range} page${range > 1 ? "s" : ""} × ৳${perPage} × ${cfg.copies} cop${cfg.copies > 1 ? "ies" : "y"}`}
+            v={moneyN(subtotal)}
+          />
+          <Row k="Service fee" v={moneyN(serviceFee)} />
+          <Row k="Sheets used" v={`${sheets * cfg.copies}`} muted />
         </div>
 
         {saveError && (
-          <p style={{ color: TK.danger, fontSize: 13, fontWeight: 600, margin: "0 0 14px" }}>
-            {saveError}
-          </p>
+          <p style={{ color: TK.danger, fontSize: 13, fontWeight: 600, margin: "0 0 14px" }}>{saveError}</p>
         )}
       </div>
     </AppShell>

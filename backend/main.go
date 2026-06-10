@@ -55,7 +55,7 @@ func main() {
 	// CORS headers on them are harmless (no browser ever calls them).
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{cfg.FrontendURL},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Content-Type"},
 		AllowCredentials: false,
 		MaxAge:           300,
@@ -67,6 +67,8 @@ func main() {
 		// Browser-facing routes.
 		r.Post("/upload", app.Upload)
 		r.Get("/jobs/{job_id}", app.GetJob)
+		r.Post("/jobs/{job_id}/files", app.AddFile)
+		r.Delete("/jobs/{job_id}/files/{file_id}", app.RemoveFile)
 		r.Put("/jobs/{job_id}/config", app.UpdateConfig)
 		r.Post("/jobs/{job_id}/pay", app.Pay)
 		r.Get("/jobs/{job_id}/status", app.JobStatus)

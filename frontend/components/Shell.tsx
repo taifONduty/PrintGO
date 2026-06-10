@@ -5,8 +5,9 @@ import { TK, rgba, KIOSK, taka } from "@/lib/theme";
 import { Icon, Logo, Button } from "@/components/ui";
 
 // ── Progress rail ───────────────────────────────────────────────────────────
-// The real flow has four visible buckets: Upload → Configure → Pay → Done.
-const RAIL = ["Upload", "Configure", "Pay", "Done"];
+// Five visible buckets: Upload → Configure → Review → Verify → Pay.
+// Pass step beyond the last index (e.g. 5) on the status screen to show all done.
+const RAIL = ["Upload", "Configure", "Review", "Verify", "Pay"];
 
 export function StepRail({ step }: { step: number }) {
   return (
@@ -225,12 +226,14 @@ export function AppShell({
   onBack,
   showRail = true,
   footer,
+  overlay,
   children,
 }: {
   step?: number;
   onBack?: () => void;
   showRail?: boolean;
   footer?: React.ReactNode;
+  overlay?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -263,6 +266,7 @@ export function AppShell({
             {children}
           </div>
           {footer}
+          {overlay}
         </div>
       </div>
 

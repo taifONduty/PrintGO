@@ -16,9 +16,10 @@ type Config struct {
 	FrontendURL   string
 	PublicBaseURL string
 
-	BWRate    float64
-	ColorRate float64
-	MinOrder  float64
+	BWRate     float64
+	ColorRate  float64
+	ServiceFee float64
+	MinOrder   float64
 
 	SSLStoreID   string
 	SSLStorePass string
@@ -44,6 +45,7 @@ func Load() *Config {
 		PublicBaseURL: getEnv("PUBLIC_BASE_URL", getEnv("RENDER_EXTERNAL_URL", "http://localhost:8080")),
 		BWRate:        getFloat("BW_RATE_TAKA", 2.00),
 		ColorRate:     getFloat("COLOR_RATE_TAKA", 5.00),
+		ServiceFee:    getFloat("SERVICE_FEE_TAKA", 3.00),
 		MinOrder:      getFloat("MIN_ORDER_TAKA", 10.00),
 		SSLStoreID:    getEnv("SSLCOMMERZ_STORE_ID", ""),
 		SSLStorePass:  getEnv("SSLCOMMERZ_STORE_PASS", ""),

@@ -11,20 +11,19 @@ import (
 // ErrNotFound is returned when a lookup matches no row.
 var ErrNotFound = errors.New("not found")
 
-// jobColumns is the canonical SELECT list. Money + timestamps are cast to text
-// so they arrive as clean strings ("20.00", ISO timestamps) without numeric or
-// time decoding on the Go side.
+// jobColumns is the canonical SELECT list for a job. Money + timestamps are
+// cast to text so they arrive as clean strings without numeric/time decoding.
 const jobColumns = `
-	id, machine_id, original_filename, file_path, file_mime, page_count,
-	color, copies, duplex, page_range_from, page_range_to,
-	price_taka::text, status, created_at::text, updated_at::text`
+	id, machine_id, page_count, color, copies, duplex,
+	page_range_from, page_range_to, price_taka::text, status,
+	created_at::text, updated_at::text`
 
 func scanJob(row pgx.Row) (*models.Job, error) {
 	var j models.Job
 	err := row.Scan(
-		&j.ID, &j.MachineID, &j.OriginalFilename, &j.FilePath, &j.FileMime, &j.PageCount,
-		&j.Color, &j.Copies, &j.Duplex, &j.PageRangeFrom, &j.PageRangeTo,
-		&j.PriceTaka, &j.Status, &j.CreatedAt, &j.UpdatedAt,
+		&j.ID, &j.MachineID, &j.PageCount, &j.Color, &j.Copies, &j.Duplex,
+		&j.PageRangeFrom, &j.PageRangeTo, &j.PriceTaka, &j.Status,
+		&j.CreatedAt, &j.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
@@ -42,38 +41,118 @@ func (d *DB) MachineExists(ctx context.Context, id string) (bool, error) {
 	return exists, err
 }
 
-// InsertJob creates a new job row with the app-generated UUID.
-func (d *DB) InsertJob(ctx context.Context, j *models.Job) (*models.Job, error) {
-	row := d.pool.QueryRow(ctx, `
-		INSERT INTO jobs (id, machine_id, original_filename, file_path, file_mime,
-			page_count, color, copies, duplex, page_range_from, page_range_to,
-			price_taka, status)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-		RETURNING `+jobColumns,
-		j.ID, j.MachineID, j.OriginalFilename, j.FilePath, j.FileMime,
-		j.PageCount, j.Color, j.Copies, j.Duplex, j.PageRangeFrom, j.PageRangeTo,
-		j.PriceTaka, j.Status,
+// InsertJob creates a new empty job row with the app-generated UUID.
+func (d *DB) InsertJob(ctx context.Context, j *models.Job) error {
+	_, err := d.pool.Exec(ctx, `
+		INSERT INTO jobs (id, machine_id, page_count, color, copies, duplex,
+			page_range_from, page_range_to, price_taka, status)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+		j.ID, j.MachineID, j.PageCount, j.Color, j.Copies, j.Duplex,
+		j.PageRangeFrom, j.PageRangeTo, j.PriceTaka, j.Status,
 	)
-	return scanJob(row)
+	return err
 }
 
-// GetJob returns the full job by id.
+// InsertFile adds a file (with an app-generated id) to a job, appended at the
+// end of the sort order.
+func (d *DB) InsertFile(ctx context.Context, f *models.File) error {
+	_, err := d.pool.Exec(ctx, `
+		INSERT INTO files (id, job_id, original_filename, file_path, file_mime, page_count, kind, sort_order)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,
+			COALESCE((SELECT MAX(sort_order)+1 FROM files WHERE job_id=$2), 0))`,
+		f.ID, f.JobID, f.OriginalFilename, f.FilePath, f.FileMime, f.PageCount, f.Kind,
+	)
+	return err
+}
+
+// GetFiles returns the files of a job in sort order.
+func (d *DB) GetFiles(ctx context.Context, jobID string) ([]models.File, error) {
+	rows, err := d.pool.Query(ctx, `
+		SELECT id, job_id, original_filename, file_path, file_mime, page_count, kind, sort_order
+		FROM files WHERE job_id=$1 ORDER BY sort_order ASC, created_at ASC`, jobID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	files := []models.File{}
+	for rows.Next() {
+		var f models.File
+		if err := rows.Scan(&f.ID, &f.JobID, &f.OriginalFilename, &f.FilePath,
+			&f.FileMime, &f.PageCount, &f.Kind, &f.SortOrder); err != nil {
+			return nil, err
+		}
+		files = append(files, f)
+	}
+	return files, rows.Err()
+}
+
+// FilePath returns the print-ready PDF path for a file belonging to a job.
+func (d *DB) FilePath(ctx context.Context, jobID, fileID string) (string, error) {
+	var path string
+	err := d.pool.QueryRow(ctx, `SELECT file_path FROM files WHERE id=$1 AND job_id=$2`, fileID, jobID).Scan(&path)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	return path, err
+}
+
+// DeleteFile removes a file from a job. Returns ErrNotFound if no such file.
+func (d *DB) DeleteFile(ctx context.Context, jobID, fileID string) error {
+	ct, err := d.pool.Exec(ctx, `DELETE FROM files WHERE id=$1 AND job_id=$2`, fileID, jobID)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// RecalcPageCount sets jobs.page_count to the sum of its files' pages.
+func (d *DB) RecalcPageCount(ctx context.Context, jobID string) error {
+	_, err := d.pool.Exec(ctx, `
+		UPDATE jobs SET page_count =
+			COALESCE((SELECT SUM(page_count) FROM files WHERE job_id=$1), 0),
+			updated_at=now()
+		WHERE id=$1`, jobID)
+	return err
+}
+
+// GetJob returns the full job (with files) by id.
 func (d *DB) GetJob(ctx context.Context, id string) (*models.Job, error) {
 	row := d.pool.QueryRow(ctx, `SELECT `+jobColumns+` FROM jobs WHERE id=$1`, id)
-	return scanJob(row)
+	job, err := scanJob(row)
+	if err != nil {
+		return nil, err
+	}
+	files, err := d.GetFiles(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	job.Files = files
+	return job, nil
 }
 
-// UpdateConfig updates print configuration + recomputed price, bumps updated_at,
-// and returns the refreshed row.
+// UpdateConfig updates print configuration + recomputed price, and returns the
+// refreshed row (with files).
 func (d *DB) UpdateConfig(ctx context.Context, id string, color bool, copies int, duplex bool, from, to *int, price string) (*models.Job, error) {
-	row := d.pool.QueryRow(ctx, `
+	_, err := d.pool.Exec(ctx, `
 		UPDATE jobs SET color=$2, copies=$3, duplex=$4, page_range_from=$5,
 			page_range_to=$6, price_taka=$7, updated_at=now()
-		WHERE id=$1
-		RETURNING `+jobColumns,
+		WHERE id=$1`,
 		id, color, copies, duplex, from, to, price,
 	)
-	return scanJob(row)
+	if err != nil {
+		return nil, err
+	}
+	return d.GetJob(ctx, id)
+}
+
+// SetPrice updates just the cached price (used after file add/remove).
+func (d *DB) SetPrice(ctx context.Context, id, price string) error {
+	_, err := d.pool.Exec(ctx, `UPDATE jobs SET price_taka=$2, updated_at=now() WHERE id=$1`, id, price)
+	return err
 }
 
 // SetStatus flips a job to a new status and bumps updated_at.
@@ -124,8 +203,8 @@ func (d *DB) FinalizePayment(ctx context.Context, jobID, status string, payload 
 }
 
 // ClaimNextJob atomically claims the oldest paid job for a machine, flips it to
-// queued, updates the machine's last_seen, and returns the job. Returns
-// ErrNotFound when no paid job is waiting.
+// queued, updates the machine's last_seen, and returns the job (with files).
+// Returns ErrNotFound when no paid job is waiting.
 func (d *DB) ClaimNextJob(ctx context.Context, machineID string) (*models.Job, error) {
 	tx, err := d.pool.Begin(ctx)
 	if err != nil {
@@ -147,20 +226,14 @@ func (d *DB) ClaimNextJob(ctx context.Context, machineID string) (*models.Job, e
 		return nil, err
 	}
 
-	row := tx.QueryRow(ctx, `
-		UPDATE jobs SET status='queued', updated_at=now()
-		WHERE id=$1 RETURNING `+jobColumns, id)
-	job, err := scanJob(row)
-	if err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE jobs SET status='queued', updated_at=now() WHERE id=$1`, id); err != nil {
 		return nil, err
 	}
-
 	if _, err := tx.Exec(ctx, `UPDATE machines SET last_seen=now(), status='online' WHERE id=$1`, machineID); err != nil {
 		return nil, err
 	}
-
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
-	return job, nil
+	return d.GetJob(ctx, id)
 }

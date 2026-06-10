@@ -2,13 +2,23 @@
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
-export interface Job {
+export type FileKind = "doc" | "img";
+
+export interface FileItem {
   id: string;
-  machine_id: string;
+  job_id: string;
   original_filename: string;
   file_path: string;
   file_mime: string;
   page_count: number;
+  kind: FileKind;
+  sort_order: number;
+}
+
+export interface Job {
+  id: string;
+  machine_id: string;
+  page_count: number; // aggregate across files
   color: boolean;
   copies: number;
   duplex: boolean;
@@ -18,6 +28,7 @@ export interface Job {
   status: JobStatus;
   created_at: string;
   updated_at: string;
+  files: FileItem[];
 }
 
 export type JobStatus =
@@ -28,12 +39,6 @@ export type JobStatus =
   | "printing"
   | "completed"
   | "failed";
-
-export interface UploadResult {
-  job_id: string;
-  page_count: number;
-  filename: string;
-}
 
 export interface JobConfig {
   color: boolean;
@@ -75,29 +80,22 @@ async function getJSON<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-/** Upload a file with progress via XHR (fetch lacks upload progress). */
-export function uploadFile(
-  file: File,
-  machineId: string,
-  onProgress?: (pct: number) => void,
-): Promise<UploadResult> {
+// Shared XHR multipart upload (fetch lacks upload progress).
+function xhrUpload(url: string, file: File, machineId: string | null, onProgress?: (pct: number) => void): Promise<Job> {
   return new Promise((resolve, reject) => {
     const form = new FormData();
     form.append("file", file);
-    form.append("machine_id", machineId);
+    if (machineId) form.append("machine_id", machineId);
 
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${API_URL}/api/upload`);
-
+    xhr.open("POST", url);
     xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable && onProgress) {
-        onProgress(Math.round((e.loaded / e.total) * 100));
-      }
+      if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
     };
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
-          resolve(JSON.parse(xhr.responseText) as UploadResult);
+          resolve(JSON.parse(xhr.responseText) as Job);
         } catch {
           reject(new ApiError("Malformed server response.", xhr.status));
         }
@@ -115,6 +113,23 @@ export function uploadFile(
     xhr.onerror = () => reject(new ApiError("Network error during upload.", 0));
     xhr.send(form);
   });
+}
+
+/** Create a new job with its first file. */
+export function uploadFile(file: File, machineId: string, onProgress?: (pct: number) => void): Promise<Job> {
+  return xhrUpload(`${API_URL}/api/upload`, file, machineId, onProgress);
+}
+
+/** Add another file to an existing job. */
+export function addFile(jobId: string, file: File, onProgress?: (pct: number) => void): Promise<Job> {
+  return xhrUpload(`${API_URL}/api/jobs/${jobId}/files`, file, null, onProgress);
+}
+
+/** Remove a file from a job. */
+export async function removeFile(jobId: string, fileId: string): Promise<Job> {
+  const res = await fetch(`${API_URL}/api/jobs/${jobId}/files/${fileId}`, { method: "DELETE" });
+  if (!res.ok) return parseError(res);
+  return res.json() as Promise<Job>;
 }
 
 export function getJob(jobId: string): Promise<Job> {

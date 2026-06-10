@@ -1,22 +1,25 @@
 "use client";
 
-import React, { Suspense, useState } from "react";
+import React, { Suspense, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AppShell } from "@/components/Shell";
+import { AppShell, PriceBar } from "@/components/Shell";
 import { FileDropzone } from "@/components/FileDropzone";
-import { Icon } from "@/components/ui";
+import { PreviewOverlay } from "@/components/PreviewOverlay";
+import { Icon, PagePreview, AddMoreTile } from "@/components/ui";
 import { TK, rgba } from "@/lib/theme";
-import { uploadFile, ApiError } from "@/lib/api";
+import { uploadFile, addFile, removeFile, ApiError, type Job, type FileItem } from "@/lib/api";
 
 function UploadInner() {
   const router = useRouter();
   const params = useSearchParams();
   const machine = params.get("machine");
 
-  const [file, setFile] = useState<File | null>(null);
-  const [progress, setProgress] = useState(0);
-  const [uploading, setUploading] = useState(false);
+  const [job, setJob] = useState<Job | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [busyLabel, setBusyLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<FileItem | null>(null);
+  const addInputRef = useRef<HTMLInputElement>(null);
 
   // No machine in the QR URL → block upload entirely.
   if (!machine) {
@@ -36,35 +39,75 @@ function UploadInner() {
           >
             <Icon name="printer" size={30} color={TK.danger} stroke={2} />
           </div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: TK.ink, margin: "0 0 8px" }}>
-            Invalid QR code
-          </h1>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: TK.ink, margin: "0 0 8px" }}>Invalid QR code</h1>
           <p style={{ fontSize: 14.5, color: TK.muted, lineHeight: 1.5, margin: 0 }}>
-            We couldn&apos;t tell which printer you&apos;re at. Please rescan the QR code on the
-            machine.
+            We couldn&apos;t tell which printer you&apos;re at. Please rescan the QR code on the machine.
           </p>
         </div>
       </AppShell>
     );
   }
 
-  const startUpload = async (f: File) => {
-    setFile(f);
+  // Upload a batch of files sequentially: the first creates the job, the rest
+  // are appended to it.
+  const addFiles = async (files: File[]) => {
     setError(null);
-    setUploading(true);
-    setProgress(0);
+    setBusy(true);
+    let current = job;
     try {
-      const res = await uploadFile(f, machine, setProgress);
-      router.push(`/configure/${res.job_id}?machine=${encodeURIComponent(machine)}`);
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        setBusyLabel(files.length > 1 ? `Uploading ${i + 1} of ${files.length}…` : "Uploading…");
+        current = current ? await addFile(current.id, f) : await uploadFile(f, machine);
+        setJob(current);
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Upload failed. Please try again.");
-      setUploading(false);
-      setFile(null);
+    } finally {
+      setBusy(false);
+      setBusyLabel("");
     }
   };
 
+  const onRemove = async (fileId: string) => {
+    if (!job) return;
+    setError(null);
+    try {
+      setJob(await removeFile(job.id, fileId));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not remove the file.");
+    }
+  };
+
+  const goConfigure = () => router.push(`/configure/${job!.id}?machine=${encodeURIComponent(machine)}`);
+
+  const files = job?.files ?? [];
+  const empty = files.length === 0;
+
   return (
-    <AppShell step={0}>
+    <AppShell
+      step={0}
+      footer={
+        !empty ? (
+          <PriceBar price={job!.price_taka} label="Configure print" sub="From" onNext={goConfigure} disabled={busy} />
+        ) : null
+      }
+      overlay={<PreviewOverlay file={preview} onClose={() => setPreview(null)} />}
+    >
+      {/* hidden input for "Add more" */}
+      <input
+        ref={addInputRef}
+        type="file"
+        multiple
+        accept=".pdf,.docx,.pptx,.jpg,.jpeg,.png"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const fs = Array.from(e.target.files ?? []);
+          if (fs.length) addFiles(fs);
+          e.target.value = "";
+        }}
+      />
+
       <div className="pg-fade" style={{ padding: "6px 18px 18px" }}>
         <h1
           style={{
@@ -78,13 +121,56 @@ function UploadInner() {
           What are we printing?
         </h1>
         <p style={{ fontSize: 14.5, color: TK.muted, margin: "0 0 20px", lineHeight: 1.45 }}>
-          Drop in a PDF, doc or image. We&apos;ll handle the rest.
+          Drop in PDFs, docs or images. We&apos;ll handle the rest.
         </p>
 
-        {uploading && file ? (
-          <UploadingCard name={file.name} progress={progress} />
+        {empty ? (
+          <FileDropzone onFiles={addFiles} disabled={busy} />
         ) : (
-          <FileDropzone onFile={startUpload} disabled={uploading} />
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(132px, 1fr))",
+              gap: 14,
+              alignItems: "start",
+            }}
+          >
+            {files.map((f) => (
+              <PagePreview
+                key={f.id}
+                name={f.original_filename}
+                pages={f.page_count}
+                kind={f.kind}
+                onDelete={() => onRemove(f.id)}
+                onExpand={() => setPreview(f)}
+              />
+            ))}
+            <AddMoreTile onClick={() => addInputRef.current?.click()} />
+          </div>
+        )}
+
+        {!empty && (
+          <div
+            className="pg-rise"
+            style={{
+              marginTop: 22,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              background: TK.accentTint,
+              borderRadius: TK.radius,
+              padding: "12px 16px",
+            }}
+          >
+            {busy && <Spinner />}
+            <span style={{ fontSize: 13.5, color: TK.accentDark, fontWeight: 600, lineHeight: 1.4 }}>
+              {busy
+                ? busyLabel
+                : `${files.length} file${files.length > 1 ? "s" : ""} · ${job!.page_count} page${
+                    job!.page_count > 1 ? "s" : ""
+                  } ready to configure`}
+            </span>
+          </div>
         )}
 
         {error && (
@@ -92,17 +178,12 @@ function UploadInner() {
             className="pg-rise"
             style={{
               marginTop: 16,
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
               background: rgba(TK.danger, 0.08),
               borderRadius: TK.radius,
               padding: "12px 16px",
             }}
           >
-            <span style={{ fontSize: 13.5, color: TK.danger, fontWeight: 600, lineHeight: 1.4 }}>
-              {error}
-            </span>
+            <span style={{ fontSize: 13.5, color: TK.danger, fontWeight: 600 }}>{error}</span>
           </div>
         )}
       </div>
@@ -110,60 +191,20 @@ function UploadInner() {
   );
 }
 
-function UploadingCard({ name, progress }: { name: string; progress: number }) {
+function Spinner() {
   return (
-    <div
+    <span
       style={{
-        background: TK.card,
-        border: `1px solid ${TK.line}`,
-        borderRadius: TK.radius,
-        padding: "20px 18px",
+        width: 16,
+        height: 16,
+        borderRadius: "50%",
+        border: `2px solid ${rgba(TK.accentDark, 0.3)}`,
+        borderTopColor: TK.accentDark,
+        display: "inline-block",
+        animation: "pgSpin .8s linear infinite",
+        flexShrink: 0,
       }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-        <span
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 11,
-            background: TK.accentTint,
-            display: "grid",
-            placeItems: "center",
-            flexShrink: 0,
-          }}
-        >
-          <Icon name="file" size={20} color={TK.accentDark} />
-        </span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: 14.5,
-              fontWeight: 600,
-              color: TK.ink,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {name}
-          </div>
-          <div style={{ fontSize: 12, color: TK.muted }}>
-            {progress < 100 ? `Uploading… ${progress}%` : "Processing document…"}
-          </div>
-        </div>
-      </div>
-      <div style={{ height: 8, borderRadius: 100, background: TK.lineSoft, overflow: "hidden" }}>
-        <div
-          style={{
-            height: "100%",
-            width: `${progress}%`,
-            background: TK.accent,
-            borderRadius: 100,
-            transition: "width .2s ease",
-          }}
-        />
-      </div>
-    </div>
+    />
   );
 }
 

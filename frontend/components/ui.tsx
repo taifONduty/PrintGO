@@ -21,7 +21,8 @@ type IconName =
   | "qr"
   | "arrowGo"
   | "spark"
-  | "upload";
+  | "upload"
+  | "expand";
 
 export function Icon({
   name,
@@ -113,6 +114,12 @@ export function Icon({
         <path d="M12 16V4M12 4l-5 5M12 4l5 5" />
         <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
       </g>
+    ),
+    expand: (
+      <path
+        d="M8 3H4a1 1 0 00-1 1v4M16 3h4a1 1 0 011 1v4M8 21H4a1 1 0 01-1-1v-4M16 21h4a1 1 0 001-1v-4"
+        {...p}
+      />
     ),
   };
   return (
@@ -618,6 +625,232 @@ export function SectionHead({
         </button>
       )}
     </div>
+  );
+}
+
+// ── Faux page art (stylised placeholder, no real content) ───────────────────
+export function PlaceholderArt() {
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        position: "relative",
+        background: "repeating-linear-gradient(135deg,#EFEAE1 0 8px,#F6F2EA 8px 16px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <span
+        style={{
+          fontFamily: "ui-monospace,SFMono-Regular,Menlo,monospace",
+          fontSize: 10,
+          color: "#A89E90",
+          letterSpacing: ".02em",
+        }}
+      >
+        image
+      </span>
+    </div>
+  );
+}
+
+// Faux page body (orange title bar + grey text lines + a block).
+function FauxPage({ kind }: { kind: FileKind }) {
+  if (kind === "img") return <PlaceholderArt />;
+  return (
+    <>
+      <div style={{ height: 9, width: "62%", borderRadius: 3, background: TK.accent, opacity: 0.85 }} />
+      <div style={{ height: 5, width: "88%", borderRadius: 3, background: TK.line }} />
+      <div style={{ height: 5, width: "94%", borderRadius: 3, background: TK.line }} />
+      <div style={{ height: 5, width: "74%", borderRadius: 3, background: TK.line }} />
+      <div
+        style={{
+          height: 46,
+          borderRadius: 4,
+          background: TK.lineSoft,
+          border: `1px solid ${TK.line}`,
+          margin: "4px 0",
+          display: "grid",
+          placeItems: "center",
+        }}
+      >
+        <Icon name="doc1" size={20} color={TK.faint} />
+      </div>
+      <div style={{ height: 5, width: "90%", borderRadius: 3, background: TK.line }} />
+      <div style={{ height: 5, width: "66%", borderRadius: 3, background: TK.line }} />
+    </>
+  );
+}
+
+export type FileKind = "doc" | "img";
+
+// ── Page preview card (upload grid tile) ────────────────────────────────────
+export function PagePreview({
+  name,
+  pages,
+  kind,
+  onDelete,
+  onExpand,
+}: {
+  name: string;
+  pages: number;
+  kind: FileKind;
+  onDelete: () => void;
+  onExpand: () => void;
+}) {
+  return (
+    <div className="pg-tile" style={{ position: "relative", width: "100%" }}>
+      <div
+        style={{
+          width: "100%",
+          aspectRatio: "1 / 1.4",
+          background: "#fff",
+          borderRadius: TK.radiusSm,
+          border: `1px solid ${TK.line}`,
+          boxShadow: "0 6px 18px rgba(33,29,23,.08)",
+          overflow: "hidden",
+          padding: kind === "img" ? 0 : "14px 12px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 7,
+        }}
+      >
+        <FauxPage kind={kind} />
+      </div>
+      <div style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 6 }}>
+        <button
+          className="pg-press"
+          onClick={onExpand}
+          title="Preview"
+          style={iconBtn}
+        >
+          <Icon name="expand" size={16} color={TK.inkSoft} stroke={2.4} />
+        </button>
+        <button className="pg-press" onClick={onDelete} title="Remove" style={iconBtn}>
+          <Icon name="trash" size={16} color={TK.danger} stroke={2.2} />
+        </button>
+      </div>
+      <div style={{ marginTop: 9, textAlign: "center" }}>
+        <div
+          style={{
+            fontSize: 12.5,
+            fontWeight: 600,
+            color: TK.ink,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            maxWidth: "100%",
+          }}
+        >
+          {name}
+        </div>
+        <div style={{ fontSize: 11, color: TK.muted }}>
+          {pages} page{pages > 1 ? "s" : ""}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const iconBtn: React.CSSProperties = {
+  width: 30,
+  height: 30,
+  borderRadius: 9,
+  border: "none",
+  background: "rgba(255,255,255,.92)",
+  boxShadow: "0 2px 8px rgba(0,0,0,.16)",
+  cursor: "pointer",
+  display: "grid",
+  placeItems: "center",
+};
+
+// ── "Add more" grid tile ─────────────────────────────────────────────────────
+export function AddMoreTile({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      className="pg-tile pg-press"
+      onClick={onClick}
+      style={{
+        width: "100%",
+        aspectRatio: "1 / 1.4",
+        background: TK.card,
+        border: `2px dashed ${TK.line}`,
+        borderRadius: TK.radius,
+        cursor: "pointer",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 12,
+        fontFamily: "inherit",
+      }}
+    >
+      <span
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: TK.radiusSm,
+          background: TK.accentTint,
+          display: "grid",
+          placeItems: "center",
+        }}
+      >
+        <Icon name="plus" size={22} color={TK.accent} stroke={2.6} />
+      </span>
+      <span style={{ fontWeight: 700, fontSize: 14, color: TK.inkSoft }}>Add more</span>
+    </button>
+  );
+}
+
+// ── Mini doc thumbnail (configure files strip) ───────────────────────────────
+export function MiniDoc({ name, kind, onClick }: { name: string; kind: FileKind; onClick: () => void }) {
+  return (
+    <button
+      className="pg-press"
+      onClick={onClick}
+      style={{ flexShrink: 0, width: 70, border: "none", background: "none", cursor: "pointer", fontFamily: "inherit", padding: 0 }}
+    >
+      <div
+        style={{
+          width: 70,
+          height: 92,
+          borderRadius: TK.radiusSm,
+          border: `1px solid ${TK.line}`,
+          background: "#fff",
+          boxShadow: "0 3px 10px rgba(33,29,23,.07)",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          gap: 5,
+          padding: kind === "img" ? 0 : "9px 8px",
+        }}
+      >
+        {kind === "img" ? (
+          <PlaceholderArt />
+        ) : (
+          <>
+            <div style={{ height: 6, width: "60%", borderRadius: 2, background: TK.accent, opacity: 0.8 }} />
+            <div style={{ height: 4, width: "90%", borderRadius: 2, background: TK.line }} />
+            <div style={{ height: 4, width: "80%", borderRadius: 2, background: TK.line }} />
+            <div style={{ height: 4, width: "88%", borderRadius: 2, background: TK.line }} />
+          </>
+        )}
+      </div>
+      <div
+        style={{
+          fontSize: 10.5,
+          color: TK.muted,
+          marginTop: 5,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {name}
+      </div>
+    </button>
   );
 }
 
