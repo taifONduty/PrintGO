@@ -4,13 +4,14 @@ import React, { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { AppShell, PriceBar } from "@/components/Shell";
 import { Icon } from "@/components/ui";
+import { BkashLogo, NagadLogo, CardLogos } from "@/components/PaymentLogos";
 import { TK, rgba, taka } from "@/lib/theme";
 import { getJob, initPayment, ApiError, type Job } from "@/lib/api";
 
 const METHODS = [
-  { id: "bkash", name: "bKash", tag: "Mobile wallet", c: "#E2136E" },
-  { id: "nagad", name: "Nagad", tag: "Mobile wallet", c: "#EE7621" },
-  { id: "card", name: "Debit / Credit card", tag: "Visa · Mastercard", c: TK.ink },
+  { id: "bkash", name: "bKash", tag: "Mobile wallet", logo: <BkashLogo height={20} /> },
+  { id: "nagad", name: "Nagad", tag: "Mobile wallet", logo: <NagadLogo height={18} /> },
+  { id: "card", name: "Debit / Credit card", tag: "Visa · Mastercard", logo: <CardLogos height={18} /> },
 ];
 
 function PayInner() {
@@ -134,19 +135,18 @@ function PayInner() {
               >
                 <span
                   style={{
-                    width: 44,
+                    minWidth: 64,
                     height: 44,
+                    padding: "0 10px",
                     borderRadius: 12,
-                    background: m.c,
+                    background: "#fff",
+                    border: `1px solid ${TK.line}`,
                     display: "grid",
                     placeItems: "center",
                     flexShrink: 0,
-                    color: "#fff",
-                    fontWeight: 800,
-                    fontSize: 17,
                   }}
                 >
-                  {m.id === "card" ? <Icon name="lock" size={20} color="#fff" stroke={2} /> : m.name[0]}
+                  {m.logo}
                 </span>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: 15.5, color: TK.ink }}>{m.name}</div>
