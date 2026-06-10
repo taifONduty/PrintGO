@@ -35,11 +35,13 @@ func Load() *Config {
 	}
 
 	cfg := &Config{
-		Port:          getEnv("PORT", "8080"),
-		DatabaseURL:   mustEnv("DATABASE_URL"),
-		UploadsDir:    getEnv("UPLOADS_DIR", "./uploads"),
-		FrontendURL:   getEnv("FRONTEND_URL", "http://localhost:3000"),
-		PublicBaseURL: getEnv("PUBLIC_BASE_URL", "http://localhost:8080"),
+		Port:        getEnv("PORT", "8080"),
+		DatabaseURL: mustEnv("DATABASE_URL"),
+		UploadsDir:  getEnv("UPLOADS_DIR", "./uploads"),
+		FrontendURL: getEnv("FRONTEND_URL", "http://localhost:3000"),
+		// On Render, PUBLIC_BASE_URL falls back to the auto-injected
+		// RENDER_EXTERNAL_URL (this service's public https URL) when unset.
+		PublicBaseURL: getEnv("PUBLIC_BASE_URL", getEnv("RENDER_EXTERNAL_URL", "http://localhost:8080")),
 		BWRate:        getFloat("BW_RATE_TAKA", 2.00),
 		ColorRate:     getFloat("COLOR_RATE_TAKA", 5.00),
 		MinOrder:      getFloat("MIN_ORDER_TAKA", 10.00),
