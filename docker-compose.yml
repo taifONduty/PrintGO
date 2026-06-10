@@ -1,0 +1,52 @@
+# PrintGO backend + a local Postgres, for running the API in containers.
+# The frontend still runs with `npm run dev` (or its own deploy).
+#
+#   docker compose up --build
+#
+# Then point the frontend at http://localhost:8080 (its default).
+# For real SSLCommerz callbacks, set PUBLIC_BASE_URL to a public tunnel URL
+# and restart: PUBLIC_BASE_URL=https://xxxx.trycloudflare.com docker compose up
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: printgo
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d printgo"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+    ports:
+      - "5432:5432"
+
+  backend:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: "8080"
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/printgo?sslmode=disable
+      UPLOADS_DIR: /data/uploads
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+      BW_RATE_TAKA: "2.00"
+      COLOR_RATE_TAKA: "5.00"
+      MIN_ORDER_TAKA: "10.00"
+      # SSLCommerz public sandbox test store. Override for your own store.
+      SSLCOMMERZ_STORE_ID: ${SSLCOMMERZ_STORE_ID:-testbox}
+      SSLCOMMERZ_STORE_PASS: ${SSLCOMMERZ_STORE_PASS:-qwerty}
+      SSLCOMMERZ_SANDBOX: "true"
+    ports:
+      - "8080:8080"
+    volumes:
+      - uploads:/data/uploads
+
+volumes:
+  pgdata:
+  uploads:

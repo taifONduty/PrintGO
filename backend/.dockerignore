@@ -1,0 +1,9 @@
+.env
+uploads/
+printervend
+*.test
+*.log
+.git
+.gitignore
+Dockerfile
+.dockerignore

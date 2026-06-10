@@ -1,0 +1,42 @@
+# ── dependencies / build output ──────────────────────────────────────────────
+node_modules/
+.next/
+out/
+dist/
+build/
+
+# Go
+backend/printervend
+*.test
+
+# ── env / secrets ────────────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.local
+!.env.example
+
+# ── runtime data ─────────────────────────────────────────────────────────────
+backend/uploads/
+uploads/
+pgdata/
+
+# ── logs ─────────────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+
+# ── OS / editor noise ────────────────────────────────────────────────────────
+.DS_Store
+.specstory/
+.cursor/
+.windsurf/
+.opencode/
+.clinerules/
+
+# next.js / vercel
+.vercel/
+next-env.d.ts
+*.tsbuildinfo
+
+# local agent/plugin tooling
+.claude/

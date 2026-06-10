@@ -1,0 +1,5 @@
+.env
+uploads/
+printervend
+*.test
+.gstack/

@@ -1,0 +1,140 @@
+@import "tailwindcss";
+
+/* ── PrintGO base ──────────────────────────────────────────────────────────── */
+:root {
+  --pg-accent: #ef7b1e;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  /* warm-cream radial wash from the design */
+  background:
+    radial-gradient(1200px 800px at 15% -10%, #fff3e6 0%, transparent 55%),
+    radial-gradient(1000px 700px at 95% 5%, #fff7ee 0%, transparent 50%),
+    #f4efe7;
+  min-height: 100vh;
+  color: #211d17;
+  font-family: var(--font-jakarta), system-ui, sans-serif;
+  font-feature-settings: "cv01", "ss01";
+}
+
+/* ── Interaction + entrance animations ───────────────────────────────────────
+   Entrance animations are enhancements only: base state is fully visible. */
+.pg-press {
+  transition:
+    transform 0.12s cubic-bezier(0.3, 0.7, 0.4, 1),
+    filter 0.15s,
+    background 0.15s,
+    border-color 0.15s,
+    box-shadow 0.2s;
+}
+.pg-press:active {
+  transform: scale(0.975);
+}
+.pg-tile {
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    box-shadow 0.2s,
+    transform 0.12s;
+}
+.pg-tile:hover {
+  border-color: var(--pg-accent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pg-fade {
+    animation: pgFade 0.34s ease both;
+  }
+  .pg-pop {
+    animation: pgPop 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .pg-rise {
+    animation: pgRise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  @keyframes pgFade {
+    from {
+      transform: translateY(8px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  @keyframes pgPop {
+    0% {
+      transform: scale(0.4);
+    }
+    60% {
+      transform: scale(1.08);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+  @keyframes pgRise {
+    from {
+      transform: translateY(14px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+}
+
+@keyframes pgSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes pgBob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+@keyframes pgBlink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.pg-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+.pg-scroll {
+  scrollbar-width: none;
+}
+
+.pg-input {
+  font-family: inherit;
+}
+.pg-input::placeholder {
+  color: #b8afa2;
+}
+.pg-input:focus,
+.pg-otp:focus {
+  outline: none;
+}
