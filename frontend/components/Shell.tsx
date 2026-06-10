@@ -238,7 +238,7 @@ export function AppShell({
       style={{
         minHeight: "100dvh",
         display: "flex",
-        alignItems: "stretch",
+        alignItems: "center",
         justifyContent: "center",
         padding: "0",
       }}
@@ -276,7 +276,7 @@ export function AppShell({
             overflow: hidden;
             box-shadow: 0 40px 90px rgba(33,29,23,.20), 0 0 0 1px rgba(33,29,23,.05);
           }
-          .pg-shell > div { height: calc(100dvh - 56px) !important; max-height: 880px; }
+          .pg-shell > div { height: calc(100dvh - 56px) !important; }
         }
       `}</style>
     </div>
