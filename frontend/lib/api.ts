@@ -158,3 +158,8 @@ export async function initPayment(jobId: string): Promise<{ gateway_url: string 
 export function getStatus(jobId: string): Promise<StatusResult> {
   return getJSON<StatusResult>(`/api/jobs/${jobId}/status`);
 }
+
+/** URL that streams a file's print-ready PDF inline (for the preview). */
+export function fileContentUrl(jobId: string, fileId: string): string {
+  return `${API_URL}/api/jobs/${jobId}/files/${fileId}/content`;
+}

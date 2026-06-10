@@ -26,6 +26,27 @@ func (a *App) GetJob(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, job)
 }
 
+// FileContent handles GET /api/jobs/{job_id}/files/{file_id}/content — streams
+// the print-ready PDF inline so the browser can render a real preview.
+func (a *App) FileContent(w http.ResponseWriter, r *http.Request) {
+	jobID := chi.URLParam(r, "job_id")
+	fileID := chi.URLParam(r, "file_id")
+
+	path, err := a.DB.FilePath(r.Context(), jobID, fileID)
+	if errors.Is(err, db.ErrNotFound) {
+		writeErr(w, http.StatusNotFound, "File not found.")
+		return
+	}
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "Could not load the file.")
+		return
+	}
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", "inline")
+	w.Header().Set("Cache-Control", "private, max-age=60")
+	http.ServeFile(w, r, path)
+}
+
 // configReq is the body for PUT /api/jobs/{job_id}/config.
 type configReq struct {
 	Color         bool `json:"color"`

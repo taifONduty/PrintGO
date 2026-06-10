@@ -2,13 +2,13 @@
 
 import React from "react";
 import { TK } from "@/lib/theme";
-import { Icon, PlaceholderArt } from "@/components/ui";
-import type { FileItem } from "@/lib/api";
+import { Icon } from "@/components/ui";
+import { fileContentUrl, type FileItem } from "@/lib/api";
 
-// Bottom-sheet preview of a file's (stylised, placeholder) pages.
+// Bottom-sheet preview that renders the real print-ready PDF.
 export function PreviewOverlay({ file, onClose }: { file: FileItem | null; onClose: () => void }) {
   if (!file) return null;
-  const pages = Math.min(file.page_count, 4);
+  const src = fileContentUrl(file.job_id, file.id);
   return (
     <div
       onClick={onClose}
@@ -89,46 +89,35 @@ export function PreviewOverlay({ file, onClose }: { file: FileItem | null; onClo
             ✕
           </button>
         </div>
-        <div
-          className="pg-scroll"
-          style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: 14, alignItems: "center", paddingBottom: 8 }}
-        >
-          {Array.from({ length: pages }).map((_, i) => (
-            <div
-              key={i}
-              style={{
-                width: 200,
-                minHeight: 280,
-                background: "#fff",
-                borderRadius: TK.radiusSm,
-                border: `1px solid ${TK.line}`,
-                boxShadow: "0 8px 24px rgba(33,29,23,.12)",
-                padding: file.kind === "img" ? 0 : "22px 20px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-                flexShrink: 0,
-                overflow: "hidden",
-              }}
-            >
-              {file.kind === "img" ? (
-                <div style={{ minHeight: 280, width: "100%" }}>
-                  <PlaceholderArt />
-                </div>
-              ) : (
-                <>
-                  <div style={{ height: 12, width: "55%", borderRadius: 3, background: TK.accent, opacity: 0.8 }} />
-                  <div style={{ height: 6, width: "92%", borderRadius: 3, background: TK.line }} />
-                  <div style={{ height: 6, width: "88%", borderRadius: 3, background: TK.line }} />
-                  <div style={{ height: 6, width: "94%", borderRadius: 3, background: TK.line }} />
-                  <div style={{ height: 6, width: "70%", borderRadius: 3, background: TK.line }} />
-                  <div style={{ height: 60, borderRadius: 5, background: TK.lineSoft, margin: "6px 0" }} />
-                  <div style={{ height: 6, width: "90%", borderRadius: 3, background: TK.line }} />
-                  <div style={{ height: 6, width: "85%", borderRadius: 3, background: TK.line }} />
-                </>
-              )}
-            </div>
-          ))}
+        {/* real document render */}
+        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+          <iframe
+            src={src}
+            title={file.original_filename}
+            style={{
+              width: "100%",
+              height: "60vh",
+              border: `1px solid ${TK.line}`,
+              borderRadius: TK.radiusSm,
+              background: "#fff",
+              boxShadow: "0 8px 24px rgba(33,29,23,.12)",
+            }}
+          />
+          <a
+            href={src}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              marginTop: 12,
+              textAlign: "center",
+              fontSize: 13,
+              fontWeight: 700,
+              color: TK.accent,
+              textDecoration: "none",
+            }}
+          >
+            Open in a new tab ↗
+          </a>
         </div>
       </div>
     </div>

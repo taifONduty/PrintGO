@@ -67,6 +67,7 @@ func main() {
 		// Browser-facing routes.
 		r.Post("/upload", app.Upload)
 		r.Get("/jobs/{job_id}", app.GetJob)
+		r.Get("/jobs/{job_id}/files/{file_id}/content", app.FileContent)
 		r.Post("/jobs/{job_id}/files", app.AddFile)
 		r.Delete("/jobs/{job_id}/files/{file_id}", app.RemoveFile)
 		r.Put("/jobs/{job_id}/config", app.UpdateConfig)
