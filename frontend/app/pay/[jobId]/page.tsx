@@ -11,7 +11,7 @@ import { getJob, initPayment, ApiError, type Job } from "@/lib/api";
 const METHODS = [
   { id: "bkash", name: "bKash", tag: "Mobile wallet", logo: <BkashLogo height={20} /> },
   { id: "nagad", name: "Nagad", tag: "Mobile wallet", logo: <NagadLogo height={18} /> },
-  { id: "card", name: "Debit / Credit card", tag: "Visa · Mastercard", logo: <CardLogos height={18} /> },
+  { id: "card", name: "Debit / Credit card", tag: "Visa · Mastercard · Amex", logo: <CardLogos height={16} /> },
 ];
 
 function PayInner() {

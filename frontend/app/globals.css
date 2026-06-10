@@ -14,7 +14,9 @@ html,
 body {
   margin: 0;
   padding: 0;
-  min-height: 100%;
+  height: 100%;
+  /* prevent iOS rubber-band revealing the page background below the app */
+  overscroll-behavior: none;
 }
 
 body {
@@ -23,10 +25,23 @@ body {
     radial-gradient(1200px 800px at 15% -10%, #fff3e6 0%, transparent 55%),
     radial-gradient(1000px 700px at 95% 5%, #fff7ee 0%, transparent 50%),
     #f4efe7;
-  min-height: 100vh;
+  /* match the app column height (dvh, not vh) so no band shows under it */
+  min-height: 100dvh;
   color: #211d17;
   font-family: var(--font-jakarta), system-ui, sans-serif;
   font-feature-settings: "cv01", "ss01";
+}
+
+/* On phones the app is full-bleed; paint the background the surface colour so
+   any momentum-scroll edge blends instead of showing the cream wash. */
+@media (max-width: 479px) {
+  body {
+    background: #fbf9f5;
+  }
+}
+
+.pg-scroll {
+  overscroll-behavior: contain;
 }
 
 /* ── Interaction + entrance animations ───────────────────────────────────────
