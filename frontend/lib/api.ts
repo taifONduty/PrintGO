@@ -159,7 +159,12 @@ export function getStatus(jobId: string): Promise<StatusResult> {
   return getJSON<StatusResult>(`/api/jobs/${jobId}/status`);
 }
 
-/** URL that streams a file's print-ready PDF inline (for the preview). */
+/** URL that streams a file's print-ready PDF inline (download / open in tab). */
 export function fileContentUrl(jobId: string, fileId: string): string {
   return `${API_URL}/api/jobs/${jobId}/files/${fileId}/content`;
+}
+
+/** URL of a rasterised PNG of a 1-based page (renders inline on every browser). */
+export function filePageUrl(jobId: string, fileId: string, page = 1): string {
+  return `${API_URL}/api/jobs/${jobId}/files/${fileId}/page/${page}`;
 }

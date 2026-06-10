@@ -6,6 +6,7 @@ import (
 	"log"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -62,4 +63,32 @@ func PageCount(pdfPath string) (int, error) {
 		return 0, fmt.Errorf("page count: %w", err)
 	}
 	return n, nil
+}
+
+// CheckPoppler logs a warning if pdftoppm (poppler-utils) is missing. Page
+// images for previews/thumbnails depend on it.
+func CheckPoppler() {
+	if _, err := exec.LookPath("pdftoppm"); err != nil {
+		log.Printf("WARNING: pdftoppm (poppler-utils) not available — page previews will not render")
+	}
+}
+
+// RenderPagePNG rasterizes a single 1-based page of a PDF to outPath (a .png)
+// using pdftoppm. Width is capped; height scales to keep the aspect ratio.
+func RenderPagePNG(ctx context.Context, pdfPath string, page int, outPath string) error {
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+
+	outNoExt := strings.TrimSuffix(outPath, ".png")
+	cmd := exec.CommandContext(ctx, "pdftoppm",
+		"-png",
+		"-f", strconv.Itoa(page), "-l", strconv.Itoa(page),
+		"-singlefile",
+		"-scale-to-x", "1000", "-scale-to-y", "-1",
+		pdfPath, outNoExt)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("pdftoppm: %v: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }

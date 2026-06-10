@@ -25,8 +25,9 @@ func main() {
 		log.Fatalf("could not create uploads dir: %v", err)
 	}
 
-	// Warn if LibreOffice is missing (DOCX/PPTX/image conversion needs it).
+	// Warn if LibreOffice / poppler are missing (conversion + page previews).
 	services.CheckLibreOffice()
+	services.CheckPoppler()
 
 	ctx := context.Background()
 	database, err := db.Connect(ctx, cfg.DatabaseURL)
@@ -68,6 +69,7 @@ func main() {
 		r.Post("/upload", app.Upload)
 		r.Get("/jobs/{job_id}", app.GetJob)
 		r.Get("/jobs/{job_id}/files/{file_id}/content", app.FileContent)
+		r.Get("/jobs/{job_id}/files/{file_id}/page/{n}", app.FilePagePNG)
 		r.Post("/jobs/{job_id}/files", app.AddFile)
 		r.Delete("/jobs/{job_id}/files/{file_id}", app.RemoveFile)
 		r.Put("/jobs/{job_id}/config", app.UpdateConfig)

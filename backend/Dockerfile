@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libreoffice-impress \
       libreoffice-draw \
       default-jre-headless \
+      poppler-utils \
       fonts-liberation \
       ca-certificates \
  && rm -rf /var/lib/apt/lists/*

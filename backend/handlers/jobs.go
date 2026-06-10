@@ -3,7 +3,11 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"printervend/db"
@@ -26,8 +30,43 @@ func (a *App) GetJob(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, job)
 }
 
+// FilePagePNG handles GET /api/jobs/{job_id}/files/{file_id}/page/{n} — renders
+// a 1-based page of the print-ready PDF to PNG (cached on disk) and serves it.
+// PNG works inline on every browser (Android Chrome won't render PDF in-page),
+// so previews and thumbnails use this instead of embedding the PDF.
+func (a *App) FilePagePNG(w http.ResponseWriter, r *http.Request) {
+	jobID := chi.URLParam(r, "job_id")
+	fileID := chi.URLParam(r, "file_id")
+	n, err := strconv.Atoi(chi.URLParam(r, "n"))
+	if err != nil || n < 1 {
+		writeErr(w, http.StatusBadRequest, "Invalid page number.")
+		return
+	}
+
+	pdfPath, err := a.DB.FilePath(r.Context(), jobID, fileID)
+	if errors.Is(err, db.ErrNotFound) {
+		writeErr(w, http.StatusNotFound, "File not found.")
+		return
+	}
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "Could not load the file.")
+		return
+	}
+
+	pngPath := filepath.Join(filepath.Dir(pdfPath), fmt.Sprintf("page-%d.png", n))
+	if _, statErr := os.Stat(pngPath); statErr != nil {
+		if rErr := services.RenderPagePNG(r.Context(), pdfPath, n, pngPath); rErr != nil {
+			writeErr(w, http.StatusNotFound, "Page not available.")
+			return
+		}
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "private, max-age=300")
+	http.ServeFile(w, r, pngPath)
+}
+
 // FileContent handles GET /api/jobs/{job_id}/files/{file_id}/content — streams
-// the print-ready PDF inline so the browser can render a real preview.
+// the print-ready PDF inline so the browser can download/open the original.
 func (a *App) FileContent(w http.ResponseWriter, r *http.Request) {
 	jobID := chi.URLParam(r, "job_id")
 	fileID := chi.URLParam(r, "file_id")

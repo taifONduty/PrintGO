@@ -3,12 +3,13 @@
 import React from "react";
 import { TK } from "@/lib/theme";
 import { Icon } from "@/components/ui";
-import { fileContentUrl, type FileItem } from "@/lib/api";
+import { filePageUrl, fileContentUrl, type FileItem } from "@/lib/api";
 
-// Bottom-sheet preview that renders the real print-ready PDF.
+// Bottom-sheet preview that renders the real document pages as centered images
+// (PNG, so it works inline on every browser including Android Chrome).
 export function PreviewOverlay({ file, onClose }: { file: FileItem | null; onClose: () => void }) {
   if (!file) return null;
-  const src = fileContentUrl(file.job_id, file.id);
+  const pages = Array.from({ length: Math.max(1, file.page_count) }, (_, i) => i + 1);
   return (
     <div
       onClick={onClose}
@@ -89,34 +90,37 @@ export function PreviewOverlay({ file, onClose }: { file: FileItem | null; onClo
             ✕
           </button>
         </div>
-        {/* real document render */}
-        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-          <iframe
-            src={src}
-            title={file.original_filename}
-            style={{
-              width: "100%",
-              height: "60vh",
-              border: `1px solid ${TK.line}`,
-              borderRadius: TK.radiusSm,
-              background: "#fff",
-              boxShadow: "0 8px 24px rgba(33,29,23,.12)",
-            }}
-          />
+        {/* real document pages, centered */}
+        <div
+          className="pg-scroll"
+          style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: 14, alignItems: "center", paddingBottom: 8 }}
+        >
+          {pages.map((n) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={n}
+              src={filePageUrl(file.job_id, file.id, n)}
+              alt={`${file.original_filename} page ${n}`}
+              loading="lazy"
+              style={{
+                width: "100%",
+                maxWidth: 360,
+                height: "auto",
+                display: "block",
+                borderRadius: TK.radiusSm,
+                border: `1px solid ${TK.line}`,
+                background: "#fff",
+                boxShadow: "0 8px 24px rgba(33,29,23,.12)",
+              }}
+            />
+          ))}
           <a
-            href={src}
+            href={fileContentUrl(file.job_id, file.id)}
             target="_blank"
             rel="noopener noreferrer"
-            style={{
-              marginTop: 12,
-              textAlign: "center",
-              fontSize: 13,
-              fontWeight: 700,
-              color: TK.accent,
-              textDecoration: "none",
-            }}
+            style={{ marginTop: 4, fontSize: 13, fontWeight: 700, color: TK.accent, textDecoration: "none" }}
           >
-            Open in a new tab ↗
+            Open full PDF ↗
           </a>
         </div>
       </div>

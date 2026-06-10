@@ -12,7 +12,7 @@ import {
   addFile,
   removeFile,
   getJob,
-  fileContentUrl,
+  filePageUrl,
   ApiError,
   type Job,
   type FileItem,
@@ -188,7 +188,7 @@ function UploadInner() {
                 name={f.original_filename}
                 pages={f.page_count}
                 kind={f.kind}
-                previewSrc={fileContentUrl(f.job_id, f.id)}
+                previewSrc={filePageUrl(f.job_id, f.id, 1)}
                 onDelete={() => onRemove(f.id)}
                 onExpand={() => setPreview(f)}
               />

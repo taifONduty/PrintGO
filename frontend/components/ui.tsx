@@ -686,21 +686,16 @@ function FauxPage({ kind }: { kind: FileKind }) {
 
 export type FileKind = "doc" | "img";
 
-// PdfThumb renders a real, static first-page thumbnail of a PDF via an iframe
-// (toolbar/scrollbars hidden, non-interactive).
+// PdfThumb renders a static first-page raster thumbnail (PNG <img>) — works
+// inline on every browser, unlike an embedded PDF.
 function PdfThumb({ src }: { src: string }) {
   return (
-    <iframe
-      src={`${src}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
-      title="preview"
-      scrolling="no"
-      style={{
-        width: "100%",
-        height: "100%",
-        border: "none",
-        background: "#fff",
-        pointerEvents: "none",
-      }}
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt="page preview"
+      loading="lazy"
+      style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top", background: "#fff" }}
     />
   );
 }

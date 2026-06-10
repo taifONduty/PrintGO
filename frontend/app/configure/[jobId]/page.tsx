@@ -7,7 +7,7 @@ import { PrintConfigForm, type LocalConfig } from "@/components/PrintConfigForm"
 import { PreviewOverlay } from "@/components/PreviewOverlay";
 import { MiniDoc, Row } from "@/components/ui";
 import { TK, RATES } from "@/lib/theme";
-import { getJob, updateConfig, fileContentUrl, ApiError, type Job, type JobConfig, type FileItem } from "@/lib/api";
+import { getJob, updateConfig, filePageUrl, ApiError, type Job, type JobConfig, type FileItem } from "@/lib/api";
 
 function toApiConfig(cfg: LocalConfig): JobConfig {
   const custom = cfg.range === "custom";
@@ -141,7 +141,7 @@ export default function ConfigurePage() {
               key={f.id}
               name={f.original_filename}
               kind={f.kind}
-              previewSrc={fileContentUrl(f.job_id, f.id)}
+              previewSrc={filePageUrl(f.job_id, f.id, 1)}
               onClick={() => setPreview(f)}
             />
           ))}
