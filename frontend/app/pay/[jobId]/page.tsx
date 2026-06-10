@@ -9,9 +9,9 @@ import { TK, rgba, taka } from "@/lib/theme";
 import { getJob, initPayment, ApiError, type Job } from "@/lib/api";
 
 const METHODS = [
-  { id: "bkash", name: "bKash", tag: "Mobile wallet", logo: <BkashLogo height={20} /> },
-  { id: "nagad", name: "Nagad", tag: "Mobile wallet", logo: <NagadLogo height={18} /> },
-  { id: "card", name: "Debit / Credit card", tag: "Visa · Mastercard · Amex", logo: <CardLogos height={16} /> },
+  { id: "bkash", name: "bKash", tag: "Mobile wallet", logo: <BkashLogo height={18} /> },
+  { id: "nagad", name: "Nagad", tag: "Mobile wallet", logo: <NagadLogo height={16} /> },
+  { id: "card", name: "Debit / Credit card", tag: "Visa · Mastercard · Amex", logo: <CardLogos /> },
 ];
 
 function PayInner() {
@@ -135,15 +135,15 @@ function PayInner() {
               >
                 <span
                   style={{
-                    minWidth: 64,
+                    width: 84,
                     height: 44,
-                    padding: "0 10px",
                     borderRadius: 12,
                     background: "#fff",
                     border: `1px solid ${TK.line}`,
                     display: "grid",
                     placeItems: "center",
                     flexShrink: 0,
+                    overflow: "hidden",
                   }}
                 >
                   {m.logo}
