@@ -225,6 +225,7 @@ export function AppShell({
   step,
   onBack,
   showRail = true,
+  showHeader = true,
   footer,
   overlay,
   children,
@@ -232,6 +233,7 @@ export function AppShell({
   step?: number;
   onBack?: () => void;
   showRail?: boolean;
+  showHeader?: boolean;
   footer?: React.ReactNode;
   overlay?: React.ReactNode;
   children: React.ReactNode;
@@ -256,7 +258,7 @@ export function AppShell({
             position: "relative",
           }}
         >
-          <AppHeader onBack={onBack} />
+          {showHeader && <AppHeader onBack={onBack} />}
           {showRail && typeof step === "number" && (
             <div style={{ padding: "4px 18px 14px" }}>
               <StepRail step={step} />
