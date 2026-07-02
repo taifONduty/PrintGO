@@ -1,9 +1,14 @@
 # PrintGO — Printing Vending Machine Web App
 
-A mobile-first web app for a self-service printing kiosk. A user scans a QR code
-on the machine, then moves through a strictly linear flow:
+A mobile-first web app for a self-service printing kiosk. A landing page (`/`)
+introduces the service; the user then moves through a strictly linear flow:
 
-> **scan QR → upload document → configure print settings → pay → printer prints**
+> **landing → upload document → configure print settings → pay → printer prints**
+
+The machine is identified by a `?machine=<id>` URL parameter (e.g.
+`?machine=VM001`). **QR-code scanning is not built yet** — it lands after the
+hardware / physical machine is assembled; for now the machine id is passed
+manually in the URL.
 
 This is a **prototype**. The printer is a USB printer on a PC running Pop!\_OS
 with CUPS. A separate polling script (not part of this repo) runs on that PC and
@@ -38,7 +43,7 @@ Plus Jakarta Sans, Bangladeshi Taka pricing.
 │   ├── services/    # pdf (libreoffice + pdfcpu), sslcommerz, pricing
 │   └── main.go
 ├── frontend/    # Next.js app
-│   ├── app/         # upload, configure/[jobId], pay/[jobId], status/[jobId]
+│   ├── app/         # page (landing), upload, configure/[jobId], review/[jobId], verify/[jobId], pay/[jobId], status/[jobId]
 │   ├── components/  # design system + FileDropzone, PrintConfigForm, StatusPoller
 │   └── lib/         # theme tokens, typed API client
 └── README.md
@@ -74,8 +79,10 @@ To run the backend without containers, follow the manual steps below.
 
 ## Prerequisites
 
-- **Go** 1.24+
-- **Node** 18+ and npm
+- **Go** 1.25+
+- **Node** 20 LTS or 22 LTS and npm — Next.js 16 requires Node ≥20.9.
+  **Do not use Node 23** (non-LTS): builds hang. If `node -v` shows 23.x,
+  install an LTS (`brew install node@22`) and use it for the frontend.
 - **LibreOffice** — required to convert DOCX/PPTX/images to PDF.
   Without it, only direct PDF uploads work (the backend logs a warning at
   startup). Install with `sudo apt install libreoffice` (Pop!\_OS) or
@@ -160,7 +167,8 @@ npm install                  # first run only
 npm run dev
 ```
 
-Open the flow with a machine id (this is what the QR encodes):
+Open the flow with a machine id (this is what the QR will encode once scanning
+is implemented; for now, pass it manually):
 
 ```
 http://localhost:3000/upload?machine=VM001
@@ -173,10 +181,11 @@ and blocks upload (the `machine_id` is the prototype's only access control).
 
 ## Flow & API
 
-A job holds **multiple files**. The frontend flow is 5 steps + status:
+A job holds **multiple files**. A landing page precedes the 5-step flow + status:
 
 | Step      | Frontend route          | Backend endpoint                                   |
 | --------- | ----------------------- | -------------------------------------------------- |
+| Landing   | `/`                     | — (marketing page; "Get started" → `/upload?machine=VM001`; `?machine=…` redirects straight to upload. QR scan → future) |
 | Upload    | `/upload?machine=VM001` | `POST /api/upload` (1st file → creates job)        |
 |           |                         | `POST /api/jobs/{id}/files` (add), `DELETE …/files/{fileId}` (remove) |
 | Configure | `/configure/{jobId}`    | `GET /api/jobs/{id}`, `PUT …/config`               |
